@@ -1,3 +1,8 @@
+# Visually Encrypted Image Transfer Application (VEITA)
+## Description
+This application was made for image encryption using visual cryptographic method to improve security and privacy in data transfer in a form of image(s). This was a project for my cryptography course.
+
+## Usages
 To run the code as **sender**, use this following command:
 ```
 python viscrypt.py gen input output n [--send hosts] [--send-port start_port]
