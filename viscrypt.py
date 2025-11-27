@@ -218,21 +218,49 @@ def start_receiver(listen_host, listen_port, dest_dir, max_files=None, reconstru
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         server.bind(listen_addr)
+        # ensure accept() does not block forever so we can check stop/max flags
+        server.settimeout(1.0)
+        # report the actual bound port (0 -> system assigned)
+        actual_port = server.getsockname()[1]
         server.listen(5)
-        print(f"Receiver listening on {listen_host}:{listen_port}, saving to {dest_dir}")
+        # record actual port to shared_state if provided so caller can report assigned ports
+        if shared_state is not None:
+            with shared_state["lock"]:
+                ports = shared_state.get("ports")
+                if ports is None:
+                    shared_state["ports"] = [actual_port]
+                else:
+                    ports.append(actual_port)
+        print(f"Receiver listening on {listen_host}:{actual_port}, saving to {dest_dir}")
         while True:
+            # allow external stop via shared_state
+            if shared_state and shared_state.get("stop"):
+                print(f"Listener {actual_port} stopping due to stop flag.")
+                break
+
             # if using shared_state and global max_files reached, exit
             if shared_state:
                 with shared_state["lock"]:
                     gcount = shared_state.get("count", 0)
                 if shared_state.get("max_files") and gcount >= int(shared_state["max_files"]):
-                    print(f"Global max_files reached ({gcount}), listener {listen_port} exiting.")
+                    print(f"Global max_files reached ({gcount}), listener {actual_port} exiting.")
                     break
 
             try:
                 conn, addr = server.accept()
             except socket.timeout:
+                # periodic wake to re-check flags
                 continue
+            except KeyboardInterrupt:
+                # if running in a thread, signal stop to other threads; if not, re-raise
+                if shared_state is not None:
+                    with shared_state["lock"]:
+                        shared_state["stop"] = True
+                    print("KeyboardInterrupt: signalling listeners to stop.")
+                    break
+                else:
+                    raise
+
             try:
                 # make client socket non-blocking by using timeouts so KeyboardInterrupt/stop can be detected
                 conn.settimeout(1.0)
@@ -254,6 +282,8 @@ def start_receiver(listen_host, listen_port, dest_dir, max_files=None, reconstru
                         remaining -= len(chunk)
                     except socket.timeout:
                         # allow periodic checks for KeyboardInterrupt / shared stop
+                        if shared_state and shared_state.get("stop"):
+                            raise ConnectionError("Aborting receive due to stop flag")
                         continue
                 # save file (avoid overwriting)
                 out_path = os.path.join(dest_dir, name)
@@ -283,10 +313,35 @@ def start_receiver(listen_host, listen_port, dest_dir, max_files=None, reconstru
             except Exception as e:
                 print(f"Failed receiving from {addr}: {e}")
             finally:
-                conn.close()
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
             # optionally reconstruct (use shared_state for cross-listener totals)
             try:
+                # helper: collect only likely image share files and exclude the reconstruction output
+                def _gather_share_files(directory, exclude_name=None):
+                    exts = {'.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff'}
+                    out = []
+                    for fname in sorted(os.listdir(directory)):
+                        if exclude_name and fname == exclude_name:
+                            continue
+                        _, ext = os.path.splitext(fname)
+                        if ext.lower() not in exts:
+                            continue
+                        full = os.path.join(directory, fname)
+                        # ensure it's a file and readable by PIL
+                        if not os.path.isfile(full):
+                            continue
+                        try:
+                            Image.open(full).verify()  # cheap validity check
+                            out.append(full)
+                        except Exception:
+                            # skip files that are not valid images yet
+                            continue
+                    return out
+
                 if shared_state:
                     recon_after = shared_state.get("reconstruct_after")
                     # perform reconstruction only once
@@ -296,12 +351,20 @@ def start_receiver(listen_host, listen_port, dest_dir, max_files=None, reconstru
                             shared_state["reconstructed"] = True
                             do_recon = True
                     if do_recon:
-                        files = sorted([os.path.join(dest_dir, f) for f in os.listdir(dest_dir)])
-                        reconstruct(files, os.path.join(dest_dir, shared_state.get("reconstruct_out", reconstruct_out)))
+                        out_name = shared_state.get("reconstruct_out", reconstruct_out)
+                        files = _gather_share_files(dest_dir, exclude_name=out_name)
+                        if files:
+                            reconstruct(files, os.path.join(dest_dir, out_name))
+                        else:
+                            print("Auto-reconstruct: no valid image shares found")
                 else:
                     if reconstruct_after and current_total >= int(reconstruct_after):
-                        files = sorted([os.path.join(dest_dir, f) for f in os.listdir(dest_dir)])
-                        reconstruct(files, os.path.join(dest_dir, reconstruct_out))
+                        out_name = reconstruct_out
+                        files = _gather_share_files(dest_dir, exclude_name=out_name)
+                        if files:
+                            reconstruct(files, os.path.join(dest_dir, out_name))
+                        else:
+                            print("Auto-reconstruct: no valid image shares found")
             except Exception as e:
                 print(f"Auto-reconstruct failed: {e}")
 
@@ -315,10 +378,21 @@ def start_receiver(listen_host, listen_port, dest_dir, max_files=None, reconstru
                 if max_files and received >= int(max_files):
                     print("Received required number of files, exiting receiver.")
                     break
+    except KeyboardInterrupt:
+        # if running single-threaded allow ctrl-c to propagate; threads handled above
+        if shared_state is not None:
+            with shared_state["lock"]:
+                shared_state["stop"] = True
+            print("KeyboardInterrupt: signalling listeners to stop.")
+        else:
+            raise
     except Exception as e:
         print(f"Receiver error: {e}")
     finally:
-        server.close()
+        try:
+            server.close()
+        except Exception:
+            pass
 
 def __main_cli_send_patch():
     pass
@@ -326,10 +400,11 @@ def __main_cli_send_patch():
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python viscrypt.py gen input.png out_prefix n [--send hosts] [--send-port start_port]")
+        print("  python viscrypt.py gen input output n [--send hosts] [--send-port start_port]")
         print("    --send hosts: semicolon/comma separated hosts (host or host:port).")
         print("    If a host has no :port it will be auto-assigned per-share starting from start_port (default 8000).")
-        print("  python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k]")
+        print("  python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k] [--scramble-ports N]")
+        print("    port may be a single port, multiple ports separated by , or ;, or use --scramble-ports N to request N random ports and assign port as 0.")
         sys.exit(1)
     cmd = sys.argv[1].lower()
 
@@ -391,32 +466,97 @@ if __name__ == "__main__":
             except Exception:
                 pass
 
-        # Support multiple ports (e.g. "8000;8001" or "8000,8001")
-        port_seps = [p for p in re.split(r"[;,]", port) if p]
-        if len(port_seps) <= 1:
-            # single listener (existing behavior)
-            start_receiver(host, port, dest_dir, max_files=max_n, reconstruct_after=recon_after)
-        else:
-            # spawn one listener thread per port, use shared_state so totals/reconstruct are global
+        # scramble ports option: user can request N random ports with --scramble-ports N
+        scramble_n = None
+        if "--scramble-ports" in extra:
+            try:
+                i = extra.index("--scramble-ports"); scramble_n = int(extra[i+1])
+            except Exception:
+                scramble_n = None
+
+        if scramble_n:
+            # spawn scramble_n listeners, each bound to a random free port (port=0)
             shared_state = {
                 "lock": threading.Lock(),
                 "count": 0,
                 "max_files": max_n,
                 "reconstruct_after": recon_after,
                 "reconstructed": False,
-                "reconstruct_out": "reconstruction.png"
+                "reconstruct_out": "reconstruction.png",
+                "ports": [],
+                "stop": False
             }
             threads = []
-            for p in port_seps:
+            for _ in range(scramble_n):
                 t = threading.Thread(
                     target=start_receiver,
-                    args=(host, p, dest_dir),
+                    args=(host, 0, dest_dir),
                     kwargs={"shared_state": shared_state},
                     daemon=False
                 )
                 t.start()
                 threads.append(t)
-                print(f"Started receiver thread for {host}:{p}, saving to {dest_dir}")
+            # wait briefly for threads to bind and report ports (timeout after 5s)
+            timeout = 5.0
+            start_t = time.time()
+            while True:
+                with shared_state["lock"]:
+                    assigned = list(shared_state.get("ports", []))
+                if len(assigned) >= scramble_n:
+                    break
+                if time.time() - start_t > timeout:
+                    break
+                time.sleep(0.05)
+            print(f"Assigned ports: {assigned}")
             # Wait for threads to finish (they will exit when global max_files reached if provided)
-            for t in threads:
-                t.join()
+            try:
+                for t in threads:
+                    t.join()
+            except KeyboardInterrupt:
+                with shared_state["lock"]:
+                    shared_state["stop"] = True
+                print("KeyboardInterrupt: stopping listeners...")
+                for t in threads:
+                    t.join()
+
+        else:
+            # Support multiple ports (e.g. "8000;8001" or "8000,8001")
+            port_seps = [p for p in re.split(r"[;,]", port) if p]
+            if len(port_seps) <= 1:
+                # single listener (existing behavior)
+                try:
+                    start_receiver(host, port, dest_dir, max_files=max_n, reconstruct_after=recon_after)
+                except KeyboardInterrupt:
+                    print("Interrupted, exiting.")
+            else:
+                # spawn one listener thread per port, use shared_state so totals/reconstruct are global
+                shared_state = {
+                    "lock": threading.Lock(),
+                    "count": 0,
+                    "max_files": max_n,
+                    "reconstruct_after": recon_after,
+                    "reconstructed": False,
+                    "reconstruct_out": "reconstruction.png",
+                    "stop": False
+                }
+                threads = []
+                for p in port_seps:
+                    t = threading.Thread(
+                        target=start_receiver,
+                        args=(host, p, dest_dir),
+                        kwargs={"shared_state": shared_state},
+                        daemon=False
+                    )
+                    t.start()
+                    threads.append(t)
+                    print(f"Started receiver thread for {host}:{p}, saving to {dest_dir}")
+                # Wait for threads to finish (they will exit when global max_files reached if provided)
+                try:
+                    for t in threads:
+                        t.join()
+                except KeyboardInterrupt:
+                    with shared_state["lock"]:
+                        shared_state["stop"] = True
+                    print("KeyboardInterrupt: stopping listeners...")
+                    for t in threads:
+                        t.join()
