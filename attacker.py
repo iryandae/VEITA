@@ -34,9 +34,31 @@ def start_receiver(listen_host, listen_port, dest_dir, max_files=None, shared_st
     try:
         server.bind(listen_addr)
         server.listen(5)
-        # set short timeout so accept() wakes periodically to check stop_event / stop_file
+        # ensure accept() does not block forever so we can check stop_event / shared_state flags
         server.settimeout(1.0)
+        # record actual bound port for shared_state (useful when port=0 / scramble)
+        actual_port = server.getsockname()[1]
+        if shared_state is not None:
+            with shared_state["lock"]:
+                ports = shared_state.get("ports")
+                if ports is None:
+                    shared_state["ports"] = [actual_port]
+                else:
+                    ports.append(actual_port)
+        # choose advertised host when binding all interfaces
+        advertised_host = listen_host
+        if str(listen_host) in ("0", "0.0.0.0", "all", "*"):
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                advertised_host = s.getsockname()[0]
+                s.close()
+            except Exception:
+                pass
         print(f"Receiver listening on {listen_host}:{listen_port}, saving to {dest_dir}")
+        # also print actual bind when system assigned port (port 0)
+        if 'actual_port' in locals():
+            print(f" -> bound as {advertised_host}:{actual_port}")
         while True:
             # check stop_event or stop_file before blocking on accept
             if stop_event and stop_event.is_set():
@@ -194,46 +216,66 @@ if __name__ == "__main__":
                 i = extra.index("--stop-port"); stop_port = int(extra[i+1])
             except Exception:
                 pass
+        # support scramble ports for attacker as well
+        scramble_n = None
+        if "--scramble-ports" in extra:
+            try:
+                i = extra.index("--scramble-ports"); scramble_n = int(extra[i+1])
+            except Exception:
+                scramble_n = None
 
         # Support multiple ports (e.g. "8000;8001" or "8000,8001")
         port_seps = [p for p in re.split(r"[;,]", port) if p]
-        if len(port_seps) <= 1:
-            stop_event = threading.Event()
-            # handle Ctrl+C in main thread by setting stop_event
-            def _on_sigint(signum, frame):
-                print("SIGINT received, stopping listener...")
-                stop_event.set()
-            signal.signal(signal.SIGINT, _on_sigint)
-            # optionally start control listener
-            if stop_port:
-                threading.Thread(target=start_control_listener, args=(host, stop_port, stop_event), daemon=True).start()
-            start_receiver(host, port, dest_dir, max_files=max_n, shared_state=None, stop_file=stop_file, stop_event=stop_event)
-        else:
+        if scramble_n:
+            # spawn scramble_n listeners bound to random free ports
             shared_state = {
                 "lock": threading.Lock(),
                 "count": 0,
                 "max_files": max_n,
+                "ports": [],
                 "stop_event": threading.Event()
             }
-            # install SIGINT handler to set shared stop_event for all threads
-            def _on_sigint_shared(signum, frame):
-                print("SIGINT received, stopping all listeners...")
-                shared_state["stop_event"].set()
-            signal.signal(signal.SIGINT, _on_sigint_shared)
             threads = []
-            # start control listener once if requested (shares same stop_event)
-            if stop_port:
-                threading.Thread(target=start_control_listener, args=(host, stop_port, shared_state["stop_event"]), daemon=True).start()
-            for p in port_seps:
+            for _ in range(scramble_n):
                 t = threading.Thread(
                     target=start_receiver,
-                    args=(host, p, dest_dir),
+                    args=(host, 0, dest_dir),
                     kwargs={"shared_state": shared_state, "stop_file": stop_file, "stop_event": shared_state["stop_event"]},
                     daemon=False
                 )
                 t.start()
                 threads.append(t)
-                print(f"Started receiver thread for {host}:{p}, saving to {dest_dir}")
-            # Wait for threads to finish (they will exit when global max_files reached or stop_event triggered)
-            for t in threads:
-                t.join()
+            # wait briefly for threads to bind and report ports
+            timeout = 5.0
+            start_t = time.time()
+            while True:
+                with shared_state["lock"]:
+                    assigned = list(shared_state.get("ports", []))
+                if len(assigned) >= scramble_n:
+                    break
+                if time.time() - start_t > timeout:
+                    break
+                time.sleep(0.05)
+            display_host = host
+            if str(host) in ("0", "0.0.0.0", "all", "*"):
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(("8.8.8.8", 80))
+                    display_host = s.getsockname()[0]
+                    s.close()
+                except Exception:
+                    pass
+            print(f"Assigned ports on {display_host}: {assigned}")
+            try:
+                for t in threads:
+                    t.join()
+            except KeyboardInterrupt:
+                shared_state["stop_event"].set()
+                print("SIGINT received, stopping listeners...")
+                for t in threads:
+                    t.join()
+            sys.exit(0)
+
+        if len(port_seps) <= 1:
+            stop_event = threading.Event()
+            # handle Ctrl+C in main thread by set
