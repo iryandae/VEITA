@@ -453,6 +453,9 @@ if __name__ == "__main__":
 
     elif cmd in ("recv", "serve") and len(sys.argv) >= 5:
         _, _, host, port, dest_dir, *extra = sys.argv
+        # accept "all" or "0" as shorthand for binding all interfaces
+        if host in ("0", "all", "*"):
+            host = "0.0.0.0"
         max_n = None
         recon_after = None
         if "--max" in extra:
