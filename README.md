@@ -13,7 +13,7 @@ python viscrypt.py gen input_image output_prefix n [--send hosts] [--send-port s
 | input_image  | Source image file name |
 | output_prefix | Prefix for generated share files |
 | n | Number of shares to generate |
-| --send hosts | (Optional) Send generated shares to targets |
+| --send hosts | Send generated shares to targets |
 | --send-port start_port | Starting port for auto assigned ports (default: 8000) |
 
 #### Host formats supported
@@ -34,4 +34,6 @@ python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k] [--
 | --max n | Stop receiver after saving n amount of shares |
 | --reconstruct-after k | Auto-reconstruct after receiving k amount of shares |
 | --scramble-ports p | Auto-assign p number of ports |
+
+> note: assign port to `0` if you want to use the `--scarmble-ports`.
 
