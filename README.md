@@ -1,10 +1,4 @@
 # Visually Encrypted Image Transfer Application (VEITA)
-## Table of Contents
-- [Description](#description)
-- [Usages](#usages)
-  - [Generating Shares](#generating-shares)
-  - [Receiving Shares](#receiving-shares)
-- [License](#license)
 
 ## Description
 VEITA is a tool for performing **visual cryptography–based image splitting and secure multi-channel transfer**.  
