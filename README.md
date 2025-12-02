@@ -2,11 +2,15 @@
 ## Table of Contents
 - [Description](#description)
 - [Usages](#usages)
-  - [Generating Shares](#genereating-shares)
+  - [Generating Shares](#generating-shares)
   - [Receiving Shares](#receiving-shares)
+- [License](#license)
 
 ## Description
-This application was made for image encryption using visual cryptographic method to improve security and privacy in data transfer in a form of image(s). This was a project for my cryptography course.
+VEITA is a tool for performing **visual cryptography–based image splitting and secure multi-channel transfer**.  
+It generates multiple image shares, sends them over customizable network channels, and reconstructs the original only when enough shares are received.
+
+Originally created for a cryptography course, it now includes full support for complex network routing, multi-threaded receivers, shuffled ports, and automated reconstruction.
 
 ## Usages
 ### Generating Shares
@@ -44,3 +48,7 @@ python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k] [--
 > notes:
 > - assign port to `0` if you want to use the `--scarmble-ports`.
 > - start the reciever before generating shares
+
+## License
+This project was developed for academic purposes in cryptography courses.
+Use responsibly.
