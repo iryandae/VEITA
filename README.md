@@ -35,5 +35,6 @@ python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k] [--
 | --reconstruct-after k | Auto-reconstruct after receiving k amount of shares |
 | --scramble-ports p | Auto-assign p number of ports |
 
-> note: assign port to `0` if you want to use the `--scarmble-ports`.
-
+> notes:
+> - assign port to `0` if you want to use the `--scarmble-ports`.
+> - start the reciever before generating shares
