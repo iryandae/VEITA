@@ -1,4 +1,13 @@
 # Visually Encrypted Image Transfer Application (VEITA)
+## Table of Contents
+- [Description](#description)
+- [Usages](#usages)
+  - [Generating Shares](#genereating-shares)
+    - [Parameters](#parameters)
+    - [Host Formats Supported](#host-formats-supported)
+  - [Receiving Shares](#receiving-shares)
+    - [Parameters](#parameters)
+
 ## Description
 This application was made for image encryption using visual cryptographic method to improve security and privacy in data transfer in a form of image(s). This was a project for my cryptography course.
 
