@@ -3,24 +3,35 @@
 This application was made for image encryption using visual cryptographic method to improve security and privacy in data transfer in a form of image(s). This was a project for my cryptography course.
 
 ## Usages
-To run the code as **sender**, use this following command:
+### Generating Shares
 ```
-python viscrypt.py gen input output n [--send hosts] [--send-port start_port]
+python viscrypt.py gen input_image output_prefix n [--send hosts] [--send-port start_port]
 ```
-Make sure to change the input to the image name and the n value for the number of shares wanted.
-Targetet host are required to send the image while the port will be set as default (8000) if left empty.
+#### Parameters
+| Argument | Description |
+| -------- | ------- |
+| input_image  | Source image file name |
+| output_prefix | Prefix for generated share files |
+| n | Number of shares to generate |
+| --send hosts | (Optional) Send generated shares to targets |
+| --send-port start_port | Starting port for auto assigned ports (default: 8000) |
 
-To run the code as **reciever**, use this following command:
-```
-python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k]
-```
-Make sure to change the host, ports, and destination directory for saving the received image(s).
-You can also limit the number of shares received and enabling auto reconstruct after receiving a certain amount of shares.
+#### Host formats supported
+- `"x.x.x.x"` for auto-port assignment
+- `"x.x.x.x:port"` or `x.x.x.x:port;x.x.x.x:port;...;x.x.x.x:port` for explicit port
+- `"x.x.x.x;x.x.x.x;...;x.x.x.x"` for multiple reciever
 
-The `attacker.py` simulate outsider that trying to interupt image transfer between sender and reciever.
-You can run it using this following command:
+### Receiving Shares
 ```
-python attacker.py recv host port dest_dir
+python viscrypt.py recv host port dest_dir [--max n] [--reconstruct-after k] [--scramble-ports N]
 ```
-Make sure to assign the host and port you want to interupt.
-The destination directory will be the location you want to use to save the received image(s).
+#### Parameters
+| Argument | Description |
+| -------- | ------- |
+| host | Interface to bind (`0`, `all`, or `*` allowed) |
+| port | Single port or  list (e.g. `8000;8001;8002`) |
+| dest_dir | Directory name to save received shares |
+| --max n | Stop receiver after saving n amount of shares |
+| --reconstruct-after k | Auto-reconstruct after receiving k amount of shares |
+| --scramble-ports p | Auto-assign p number of ports |
+
