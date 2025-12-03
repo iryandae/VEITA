@@ -11,7 +11,6 @@ It generates multiple image shares, sends them over customizable network channel
   - [Send Tab](#send-tab)
   - [Receiver Tab](#receiver-tab)
   - [Log Tab](#log-tab)
-- [License](#license)
 
 
 # Requirements
@@ -143,7 +142,3 @@ Displays:
 - Errors/warnings  
 
 Useful for debugging and network monitoring.
-
-## License
-This project was developed for academic purposes in cryptography courses.
-Use responsibly.
