@@ -2,6 +2,11 @@
 VEITA is a tool for performing **[visual cryptography–based image splitting](https://en.wikipedia.org/wiki/Visual_cryptography) and secure multi-channel transfer**.  
 It generates multiple image shares, sends them over customizable network channels, and reconstructs the original only when enough shares are received.
 
+## Requirements
+- Python 3.11.9 or latest
+- NumPy 1.26.1
+- Pillow 10.1.0
+
 Originally created for a cryptography course, it now includes full support for complex network routing, multi-threaded receivers, shuffled ports, and automated reconstruction.
 
 ---
