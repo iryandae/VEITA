@@ -122,7 +122,7 @@ class VEITAGUI(tk.Tk):
     def _build_receiver(self):
         f = self.tab_receiver
         # Destination row at top
-        ttk.Label(f, text='Dest dir:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        ttk.Label(f, text='Save folder:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
         self.rc_dest = tk.StringVar(value=RECON)
         ttk.Entry(f, textvariable=self.rc_dest, width=50).grid(row=0, column=1, columnspan=4, padx=4, pady=4, sticky='ew')
         ttk.Button(f, text='Browse', command=self._browse_rc_dest).grid(row=0, column=5, padx=4, pady=4, sticky='w')
