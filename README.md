@@ -66,7 +66,7 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 
 ## Send Tab
 
-<img width="1065" height="677" alt="Send Tab" src="https://github.com/user-attachments/assets/6927c8be-2707-485f-a83b-ed41343c9842" />
+<img width="1077" height="690" alt="VEITA GUI - send tab" src="https://github.com/user-attachments/assets/495b246e-c54f-402c-9710-15209a00adbb" />
 
 ### Features:
 - **Input image selection**  
@@ -78,9 +78,6 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 - **Generate button**  
   Produces shares and displays them in the *Available Shares* listbox.
 
-- **Refresh button**  
-  Reloads the output directory to update the share list.
-
 - **Targets field**  
   Hosts can be entered in formats:
   - `x.x.x.x` (auto-port)
@@ -90,14 +87,22 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 - **Start port**  
   Used for hosts without explicit ports (default: `8000`).
 
+- **Refresh button**  
+  Reloads the output directory to update the share list.
+
 - **Send Selected button**  
   Sends highlighted shares in the list to the target destinations.
 
 ## Receiver Tab
 
-<img width="1066" height="677" alt="Receiver Tab" src="https://github.com/user-attachments/assets/f79167dd-3daa-48ee-a141-c18fdeeeef54" />
+<img width="1077" height="690" alt="image" src="https://github.com/user-attachments/assets/6d9aa7d6-3dbf-44f8-a1d5-75b4342cab35" />
+
+
 
 ### Features:
+- **Save folder**  
+  Folder where incoming shares will be saved.
+
 - **Host binding**  
   Options:  
   - `0.0.0.0` (bind all IPs)  
@@ -107,10 +112,7 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
   Supports:
   - Single port (e.g., `8000`)
   - Multiple ports (`8000;8001;8002`)
-  - Or set to `0` when using scramble mode
-
-- **Destination directory**  
-  Folder where incoming shares will be saved.
+  - Or set the amount of ports when using `Scramble Ports`
 
 - **Max files field**  
   Auto-stops the receiver after a certain number of shares.
@@ -118,14 +120,11 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 - **Reconstruct after field**  
   Auto-reconstructs the image when enough shares are collected.
 
-- **List Receivers button**  
-  Shows active listener threads.
-
-- **Start Receiver button**  
-  Launches listeners in the background.
-
 - **Stop button**  
   Stops all active receivers.
+  
+- **Start Receiver button**  
+  Launches listeners in the background.
 
 ---
 
