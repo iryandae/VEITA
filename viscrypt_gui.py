@@ -49,7 +49,7 @@ class VEITAGUI(tk.Tk):
         filem.add_command(label='Exit', command=self.quit)
         menubar.add_cascade(label='File', menu=filem)
         helpm = tk.Menu(menubar, tearoff=0)
-        helpm.add_command(label='About', command=lambda: webbrowser.open('https://github.com/iryandae/VEITA/tree/main'))
+        helpm.add_command(label='About', command=lambda: webbrowser.open('https://github.com/iryandae/VEITA/tree/main?tab=readme-ov-file#gui-version'))
         menubar.add_cascade(label='Help', menu=helpm)
         self.config(menu=menubar)
 
@@ -63,7 +63,7 @@ class VEITAGUI(tk.Tk):
         self.tab_log = ttk.Frame(nb, padding=10)
 
         nb.add(self.tab_send, text='Send')
-        nb.add(self.tab_receiver, text='Receiver')
+        nb.add(self.tab_receiver, text='Receive')
         nb.add(self.tab_log, text='Log')
 
         self._build_send()
@@ -83,73 +83,105 @@ class VEITAGUI(tk.Tk):
         ttk.Label(f, text='Input image:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
         self.gen_input_var = tk.StringVar()
         ttk.Entry(f, textvariable=self.gen_input_var, width=60).grid(row=0, column=1, padx=4, pady=4, sticky='ew')
-        ttk.Button(f, text='Browse', command=self._browse_gen_input).grid(row=0, column=2, padx=4, pady=4)
+        ttk.Button(f, text='Browse', command=self._browse_gen_input).grid(row=0, column=2, padx=4, pady=4, sticky='ew')
 
         ttk.Label(f, text='Number of shares:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
         self.gen_n_var = tk.IntVar(value=2)
         ttk.Entry(f, textvariable=self.gen_n_var, width=10).grid(row=1, column=1, sticky='w', padx=4, pady=4)
 
-        ttk.Button(f, text='Generate', command=self._generate).grid(row=1, column=2, sticky='w', padx=4, pady=8)
+        ttk.Button(f, text='Generate', command=self._generate).grid(row=1, column=2, sticky='ew', padx=4, pady=4)
 
         # Separator / spacer
         sep = ttk.Separator(f, orient='horizontal')
         sep.grid(row=2, column=0, columnspan=3, sticky='ew', pady=(8, 8))
 
+        # Targets and port above list
+        ttk.Label(f, text='Targets:').grid(row=3, column=0, sticky='w', padx=4, pady=4)
+        self.send_targets_var = tk.StringVar()
+        ttk.Entry(f, textvariable=self.send_targets_var, width=60).grid(row=3, column=1, padx=4, pady=4, sticky='ew')
+        ttk.Label(f, text='Start port:').grid(row=4, column=0, sticky='w', padx=4, pady=4)
+        self.send_port_var = tk.IntVar(value=8000)
+        ttk.Entry(f, textvariable=self.send_port_var, width=10).grid(row=4, column=1, sticky='w', padx=4, pady=4)
+
         # Files list area
-        ttk.Label(f, text='Available shares:').grid(row=3, column=0, sticky='w', padx=4, pady=4)
+        ttk.Label(f, text='Available shares:').grid(row=5, column=0, sticky='w', padx=4, pady=4)
         self.files_listbox = tk.Listbox(f, selectmode='extended', height=12)
-        self.files_listbox.grid(row=4, column=0, columnspan=3, sticky='nsew', padx=4, pady=4)
+        self.files_listbox.grid(row=6, column=0, columnspan=3, sticky='nsew', padx=4, pady=4)
         # scrollbar
         sb = ttk.Scrollbar(f, orient='vertical', command=self.files_listbox.yview)
         self.files_listbox.configure(yscrollcommand=sb.set)
-        sb.grid(row=4, column=3, sticky='ns')
+        sb.grid(row=6, column=3, sticky='ns')
 
-        # Refresh / Send controls
-        ttk.Button(f, text='Refresh', command=self._refresh_file_list).grid(row=5, column=0, sticky='w', padx=4, pady=4)
-        ttk.Label(f, text='Targets:').grid(row=6, column=0, sticky='w', padx=4, pady=4)
-        self.send_targets_var = tk.StringVar()
-        ttk.Entry(f, textvariable=self.send_targets_var, width=60).grid(row=6, column=1, padx=4, pady=4, sticky='ew')
-        ttk.Label(f, text='Start port:').grid(row=7, column=0, sticky='w', padx=4, pady=4)
-        self.send_port_var = tk.IntVar(value=8000)
-        ttk.Entry(f, textvariable=self.send_port_var, width=10).grid(row=7, column=1, sticky='w', padx=4, pady=4)
-        ttk.Button(f, text='Send Selected', command=self._send_selected).grid(row=7, column=2, sticky='w', padx=4, pady=8)
+        # Controls under list
+        ttk.Button(f, text='Refresh', command=self._refresh_file_list).grid(row=7, column=0, sticky='w', padx=4, pady=4)
+        ttk.Button(f, text='Send Selected', command=self._send_selected).grid(row=7, column=2, sticky='e', padx=4, pady=4)
 
         f.columnconfigure(1, weight=1)
         self._refresh_file_list()
 
     def _build_receiver(self):
         f = self.tab_receiver
-        ttk.Label(f, text='Host:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
-        self.rc_host = tk.StringVar(value='0.0.0.0')
-        ttk.Entry(f, textvariable=self.rc_host, width=20).grid(row=0, column=1, sticky='w', padx=4, pady=4)
-
-        ttk.Label(f, text='Port:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
-        self.rc_port = tk.IntVar(value=8000)
-        ttk.Entry(f, textvariable=self.rc_port, width=10).grid(row=1, column=1, sticky='w', padx=4, pady=4)
-
-        ttk.Label(f, text='Dest dir:').grid(row=2, column=0, sticky='w', padx=4, pady=4)
+        # Destination row at top
+        ttk.Label(f, text='Dest dir:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
         self.rc_dest = tk.StringVar(value=RECON)
-        ttk.Entry(f, textvariable=self.rc_dest, width=60).grid(row=2, column=1, padx=4, pady=4, sticky='ew')
-        ttk.Button(f, text='Browse', command=self._browse_rc_dest).grid(row=2, column=2, padx=4, pady=4)
+        ttk.Entry(f, textvariable=self.rc_dest, width=50).grid(row=0, column=1, columnspan=4, padx=4, pady=4, sticky='ew')
+        ttk.Button(f, text='Browse', command=self._browse_rc_dest).grid(row=0, column=5, padx=4, pady=4, sticky='w')
 
-        ttk.Label(f, text='Max files:').grid(row=3, column=0, sticky='w', padx=4, pady=4)
+        # Host / Port / Scramble row (mirrors Send tab alignment)
+        ttk.Label(f, text='Host:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
+        self.rc_host = tk.StringVar(value='0.0.0.0')
+        ttk.Entry(f, textvariable=self.rc_host, width=18).grid(row=1, column=1, sticky='w', padx=4, pady=4)
+
+        self.rc_port_label = ttk.Label(f, text='Port:')
+        self.rc_port_label.grid(row=2, column=1, sticky='w', padx=4, pady=4)
+        self.rc_port = tk.IntVar(value=8000)
+        self.rc_port_entry = ttk.Entry(f, textvariable=self.rc_port, width=10)
+        self.rc_port_entry.grid(row=2, column=2, sticky='w', padx=2, pady=4)
+
+        self.rc_use_scramble = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text='Scramble Ports', variable=self.rc_use_scramble, command=self._toggle_scramble).grid(row=2, column=0, sticky='w', padx=4, pady=4)
+
+        # Max files row
+        self.rc_use_max = tk.BooleanVar(value=False)
         self.rc_max = tk.StringVar(value='')
-        ttk.Entry(f, textvariable=self.rc_max, width=10).grid(row=3, column=1, sticky='w', padx=4, pady=4)
+        ttk.Checkbutton(f, text='Limit max files', variable=self.rc_use_max, command=self._toggle_max).grid(row=4, column=0, sticky='w', padx=4, pady=4)
+        lbl_max = ttk.Label(f, text='Max files:')
+        ent_max = ttk.Entry(f, textvariable=self.rc_max, width=10)
+        lbl_max.grid(row=4, column=1, sticky='w', padx=4, pady=4)
+        ent_max.grid(row=4, column=2, sticky='w', padx=2, pady=4)
+        self._max_widgets = [lbl_max, ent_max]
 
-        ttk.Label(f, text='Reconstruct after:').grid(row=4, column=0, sticky='w', padx=4, pady=4)
+        # Reconstruct row
+        self.rc_use_recon_after = tk.BooleanVar(value=False)
         self.rc_recon_after = tk.StringVar(value='')
-        ttk.Entry(f, textvariable=self.rc_recon_after, width=10).grid(row=4, column=1, sticky='w', padx=4, pady=4)
+        ttk.Checkbutton(f, text='Auto reconstruct', variable=self.rc_use_recon_after, command=self._toggle_recon).grid(row=5, column=0, sticky='w', padx=4, pady=4)
+        lbl_recon = ttk.Label(f, text='After N files:')
+        ent_recon = ttk.Entry(f, textvariable=self.rc_recon_after, width=10)
+        lbl_recon.grid(row=5, column=1, sticky='w', padx=4, pady=4)
+        ent_recon.grid(row=5, column=2, sticky='w', padx=2, pady=4)
+        self._recon_widgets = [lbl_recon, ent_recon]
 
-        ttk.Button(f, text='Start Receiver', command=self._start_receiver).grid(row=5, column=1, sticky='w', padx=4, pady=8)
-        ttk.Button(f, text='List Receivers', command=self._list_receivers).grid(row=5, column=2, sticky='w', padx=4, pady=8)
+        sep = ttk.Separator(f, orient='horizontal')
+        sep.grid(row=6, column=0, columnspan=6, sticky='ew', pady=(8, 8))
 
-        self.receivers_listbox = tk.Listbox(f, height=6)
-        self.receivers_listbox.grid(row=6, column=0, columnspan=2, sticky='nsew', padx=4, pady=4)
+        # Receiver list area (distinct from Send list)
+        ttk.Label(f, text='Receivers:').grid(row=7, column=0, sticky='w', padx=4, pady=4)
+        self.receivers_listbox = tk.Listbox(f, selectmode='extended', height=11)
+        self.receivers_listbox.grid(row=8, column=0, columnspan=6, sticky='nsew', padx=4, pady=4)
         rsb = ttk.Scrollbar(f, orient='vertical', command=self.receivers_listbox.yview)
         self.receivers_listbox.configure(yscrollcommand=rsb.set)
-        rsb.grid(row=6, column=2, sticky='ns')
-        ttk.Button(f, text='Stop', command=self._stop_selected_receiver).grid(row=7, column=1, sticky='w', padx=4, pady=6)
-        f.columnconfigure(1, weight=1)
+        rsb.grid(row=8, column=6, sticky='ns')
+
+        ttk.Button(f, text='Start Receiver', command=self._start_receiver).grid(row=9, column=5, sticky='e', padx=4, pady=4)
+        ttk.Button(f, text='Stop', command=self._stop_selected_receiver).grid(row=9, column=0, sticky='w', padx=4, pady=4)
+
+        for c in range(1, 5):
+            f.columnconfigure(c, weight=1)
+
+        # hide optional rows initially
+        self._toggle_scramble()
+        self._toggle_max()
+        self._toggle_recon()
 
     def _build_log(self):
         f = self.tab_log
@@ -256,14 +288,26 @@ class VEITAGUI(tk.Tk):
     def _start_receiver(self):
         host = self.rc_host.get()
         # ensure numeric values are converted
-        try:
-            port = int(self.rc_port.get())
-        except Exception:
-            messagebox.showerror('Error', 'Port must be a number')
-            return
+        scramble_n = 0
+        port = 0
+        if self.rc_use_scramble.get():
+            try:
+                scramble_n = int(self.rc_port.get())
+            except Exception:
+                messagebox.showerror('Error', 'Scramble ports must be a number')
+                return
+            if scramble_n <= 0:
+                messagebox.showerror('Error', 'Scramble ports must be greater than 0')
+                return
+        else:
+            try:
+                port = int(self.rc_port.get())
+            except Exception:
+                messagebox.showerror('Error', 'Port must be a number')
+                return
         dest = self.rc_dest.get()
-        max_files = int(self.rc_max.get()) if self.rc_max.get() else None
-        recon_after = int(self.rc_recon_after.get()) if self.rc_recon_after.get() else None
+        max_files = int(self.rc_max.get()) if (self.rc_use_max.get() and self.rc_max.get()) else None
+        recon_after = int(self.rc_recon_after.get()) if (self.rc_use_recon_after.get() and self.rc_recon_after.get()) else None
         os.makedirs(dest, exist_ok=True)
         rid = uuid.uuid4().hex[:8]
         shared_state = {
@@ -277,7 +321,7 @@ class VEITAGUI(tk.Tk):
             'stop': False
         }
 
-        def _run():
+        def _run_single():
             try:
                 self._log(f'Starting receiver {rid} on {host}:{port} saving to {dest}')
                 self._set_status(f'Receiver {rid} running')
@@ -288,17 +332,106 @@ class VEITAGUI(tk.Tk):
             finally:
                 self._set_status('Ready')
 
-        t = threading.Thread(target=_run, daemon=True)
-        t.start()
-        self.receivers[rid] = {'thread': t, 'state': shared_state, 'host': host, 'port': port, 'dest': dest}
+        def _run_scramble(n):
+            threads = []
+            self._log(f'Starting {n} receivers on random ports (host {host}) saving to {dest}')
+            self._set_status(f'Receivers {rid} running')
+            for _ in range(n):
+                t = threading.Thread(
+                    target=start_receiver,
+                    args=(host, 0, dest),
+                    kwargs={
+                        'shared_state': shared_state,
+                        'max_files': shared_state.get('max_files'),
+                        'reconstruct_after': shared_state.get('reconstruct_after'),
+                        'reconstruct_out': shared_state.get('reconstruct_out'),
+                    },
+                    daemon=True
+                )
+                t.start()
+                threads.append(t)
+
+            # small wait to collect assigned ports
+            start_wait = time.time()
+            while time.time() - start_wait < 2.0:
+                with shared_state['lock']:
+                    if len(shared_state.get('ports', [])) >= n:
+                        break
+                time.sleep(0.05)
+            self._log(f'Scramble receivers started on ports: {shared_state.get("ports", [])}')
+            # don't join here; threads tracked in receivers dict
+            return threads
+
+        threads = None
+        if scramble_n and scramble_n > 0:
+            threads = _run_scramble(scramble_n)
+        else:
+            t = threading.Thread(target=_run_single, daemon=True)
+            t.start()
+            threads = [t]
+
+        self.receivers[rid] = {'threads': threads, 'state': shared_state, 'host': host, 'port': port if not scramble_n else 'random', 'dest': dest}
         self._list_receivers()
 
+    def _toggle_scramble(self):
+        if self.rc_use_scramble.get():
+            # reuse the same input as "number of ports" when scrambling
+            self.rc_port_label.configure(text='Ports (N):')
+            # default to 0 when switching into scramble mode
+            if self.rc_port.get() == 8000:
+                self.rc_port.set(0)
+            self.rc_port_entry.state(['!disabled'])
+        else:
+            self.rc_port_label.configure(text='Port:')
+            if self.rc_port.get() <= 0:
+                self.rc_port.set(8000)
+            self.rc_port_entry.state(['!disabled'])
+
+    def _toggle_max(self):
+        if self.rc_use_max.get():
+            for w in self._max_widgets:
+                w.grid()
+        else:
+            for w in self._max_widgets:
+                w.grid_remove()
+            self.rc_max.set('')
+
+    def _toggle_recon(self):
+        if self.rc_use_recon_after.get():
+            for w in self._recon_widgets:
+                w.grid()
+        else:
+            for w in self._recon_widgets:
+                w.grid_remove()
+            self.rc_recon_after.set('')
+
     def _list_receivers(self):
+        # Keep current selection stable across refreshes
+        selected_ids = set()
+        try:
+            for idx in self.receivers_listbox.curselection():
+                item = self.receivers_listbox.get(idx)
+                selected_ids.add(item.split('|', 1)[0])
+        except Exception:
+            selected_ids = set()
+
         self.receivers_listbox.delete(0, 'end')
         for rid, info in list(self.receivers.items()):
             count = info['state'].get('count', 0)
-            text = f"{rid}: {info['host']}:{info['port']} -> {info['dest']} (count={count})"
+            ports = info['state'].get('ports') or info.get('port')
+            if isinstance(ports, list):
+                port_display = ','.join(str(p) for p in ports)
+            else:
+                port_display = str(ports)
+            text = f"{rid}: {info['host']}:{port_display} -> {info['dest']} (count={count})"
             self.receivers_listbox.insert('end', rid + '|' + text)
+
+        # restore selection if the items still exist
+        if selected_ids:
+            for i in range(self.receivers_listbox.size()):
+                rid = self.receivers_listbox.get(i).split('|', 1)[0]
+                if rid in selected_ids:
+                    self.receivers_listbox.selection_set(i)
 
     def _periodic(self):
         # update receiver counts periodically
