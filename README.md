@@ -130,7 +130,7 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 
 ## Log Tab
 
-<img width="1070" height="677" alt="Log Tab" src="https://github.com/user-attachments/assets/0bf544b9-c662-4a4c-b849-7e1efa7d9d66" />
+<img width="1077" height="690" alt="VEITA GUI - log tab" src="https://github.com/user-attachments/assets/e09ccc7f-d32a-4161-88a0-d50921bbbf2f" />
 
 Displays:
 - Sent files  
