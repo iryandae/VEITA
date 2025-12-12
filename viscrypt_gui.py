@@ -5,6 +5,7 @@ import uuid
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
+import re
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
@@ -99,9 +100,18 @@ class VEITAGUI(tk.Tk):
         ttk.Label(f, text='Targets:').grid(row=3, column=0, sticky='w', padx=4, pady=4)
         self.send_targets_var = tk.StringVar()
         ttk.Entry(f, textvariable=self.send_targets_var, width=60).grid(row=3, column=1, padx=4, pady=4, sticky='ew')
-        ttk.Label(f, text='Start port:').grid(row=4, column=0, sticky='w', padx=4, pady=4)
-        self.send_port_var = tk.IntVar(value=8000)
-        ttk.Entry(f, textvariable=self.send_port_var, width=10).grid(row=4, column=1, sticky='w', padx=4, pady=4)
+        self.send_port_label = ttk.Label(f, text='Start port:')
+        self.send_port_label.grid(row=4, column=0, sticky='w', padx=4, pady=4)
+        self.send_port_var = tk.StringVar(value='8000')
+        self.send_port_entry = ttk.Entry(f, textvariable=self.send_port_var, width=14)
+        self.send_port_entry.grid(row=4, column=1, sticky='ew', padx=4, pady=4)
+        self.send_use_start_port = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            f,
+            text='Auto-assign ports',
+            variable=self.send_use_start_port,
+            command=self._toggle_send_start_port
+        ).grid(row=4, column=2, sticky='w', padx=4, pady=4)
 
         # Files list area
         ttk.Label(f, text='Available shares:').grid(row=5, column=0, sticky='w', padx=4, pady=4)
@@ -134,8 +144,8 @@ class VEITAGUI(tk.Tk):
 
         self.rc_port_label = ttk.Label(f, text='Port:')
         self.rc_port_label.grid(row=2, column=1, sticky='w', padx=4, pady=4)
-        self.rc_port = tk.IntVar(value=8000)
-        self.rc_port_entry = ttk.Entry(f, textvariable=self.rc_port, width=10)
+        self.rc_port = tk.StringVar(value='8000')
+        self.rc_port_entry = ttk.Entry(f, textvariable=self.rc_port, width=12)
         self.rc_port_entry.grid(row=2, column=2, sticky='w', padx=2, pady=4)
 
         self.rc_use_scramble = tk.BooleanVar(value=False)
@@ -275,21 +285,108 @@ class VEITAGUI(tk.Tk):
             messagebox.showinfo('Send', 'No files selected')
             return
         targets = self.send_targets_var.get()
-        start_port = self.send_port_var.get()
+        start_port_raw = self.send_port_var.get().strip()
+        target_items = [t.strip() for t in re.split(r"[;,]", targets) if t.strip()]
+        if not target_items:
+            messagebox.showerror('Error', 'No targets specified')
+            return
+
+        final_targets = []
+        missing_hosts = []
+        with_ports = []
+        for t in target_items:
+            if ':' in t:
+                host, p = t.rsplit(':', 1)
+                host = host.strip()
+                p = p.strip()
+                if not host or not p:
+                    messagebox.showerror('Error', f'Invalid target entry: {t}')
+                    return
+                try:
+                    with_ports.append((host, int(p)))
+                except Exception:
+                    messagebox.showerror('Error', f'Port must be a number in target: {t}')
+                    return
+            else:
+                missing_hosts.append(t)
+
+        auto_mode = self.send_use_start_port.get()
+        manual_ports = []
+        if auto_mode:
+            try:
+                base_port = int(start_port_raw)
+            except Exception:
+                messagebox.showerror('Error', 'Start port must be a number')
+                return
+            if base_port <= 0:
+                messagebox.showerror('Error', 'Start port must be greater than 0')
+                return
+        else:
+            # parse manual ports list (comma/semicolon separated)
+            if not start_port_raw:
+                messagebox.showerror('Error', 'Provide port(s) when auto-assign is off')
+                return
+            for p in re.split(r"[;,]", start_port_raw):
+                if not p.strip():
+                    continue
+                try:
+                    manual_ports.append(int(p.strip()))
+                except Exception:
+                    messagebox.showerror('Error', f'Ports must be numbers (got "{p}")')
+                    return
+            if len(manual_ports) < len(missing_hosts):
+                messagebox.showerror('Error', 'Not enough ports for hosts without explicit ports')
+                return
+
+        # build final targets preserving order
+        auto_idx = 0
+        manual_idx = 0
+        for t in target_items:
+            if ':' in t:
+                host, p = t.rsplit(':', 1)
+                final_targets.append((host.strip(), int(p.strip())))
+            else:
+                if auto_mode:
+                    assigned = base_port + auto_idx
+                    auto_idx += 1
+                else:
+                    assigned = manual_ports[manual_idx]
+                    manual_idx += 1
+                final_targets.append((t, assigned))
+
+        targets_for_send = [f"{h}:{p}" for h, p in final_targets]
+        start_port = final_targets[0][1] if final_targets else 8000
         paths = [os.path.join(OUTPUT_DIR, s) for s in sel]
         def _work():
             self._set_status('Sending...')
-            self._log(f'Sending {len(paths)} files to {targets} (start port {start_port})')
-            results = send_shares_over_network(paths, targets, default_port=int(start_port))
+            mode_desc = 'auto' if auto_mode else 'manual ports'
+            self._log(f'Sending {len(paths)} files to {targets_for_send} ({mode_desc})')
+            results = send_shares_over_network(paths, targets_for_send, default_port=int(start_port))
             self._log('Send results: ' + str(results))
             self._set_status('Ready')
         threading.Thread(target=_work, daemon=True).start()
+
+    def _toggle_send_start_port(self):
+        if self.send_use_start_port.get():
+            self.send_port_label.configure(text='Start port:')
+            self.send_port_entry.state(['!disabled'])
+            # restore default if empty or non-positive
+            try:
+                val = int(self.send_port_var.get())
+            except Exception:
+                val = 0
+            if val <= 0:
+                self.send_port_var.set('8000')
+        else:
+            # manual ports list mode
+            self.send_port_label.configure(text='Port(s):')
+            self.send_port_entry.state(['!disabled'])
 
     def _start_receiver(self):
         host = self.rc_host.get()
         # ensure numeric values are converted
         scramble_n = 0
-        port = 0
+        port_list = []
         if self.rc_use_scramble.get():
             try:
                 scramble_n = int(self.rc_port.get())
@@ -300,10 +397,17 @@ class VEITAGUI(tk.Tk):
                 messagebox.showerror('Error', 'Scramble ports must be greater than 0')
                 return
         else:
+            raw_ports = [p.strip() for p in re.split(r"[;,]", self.rc_port.get() or '') if p.strip()]
+            if not raw_ports:
+                messagebox.showerror('Error', 'Port must be provided')
+                return
             try:
-                port = int(self.rc_port.get())
+                port_list = [int(p) for p in raw_ports]
             except Exception:
-                messagebox.showerror('Error', 'Port must be a number')
+                messagebox.showerror('Error', 'All ports must be numbers')
+                return
+            if any(p <= 0 for p in port_list):
+                messagebox.showerror('Error', 'Ports must be greater than 0')
                 return
         dest = self.rc_dest.get()
         max_files = int(self.rc_max.get()) if (self.rc_use_max.get() and self.rc_max.get()) else None
@@ -321,14 +425,14 @@ class VEITAGUI(tk.Tk):
             'stop': False
         }
 
-        def _run_single():
+        def _run_single(port_value):
             try:
-                self._log(f'Starting receiver {rid} on {host}:{port} saving to {dest}')
+                self._log(f'Starting receiver {rid} on {host}:{port_value} saving to {dest}')
                 self._set_status(f'Receiver {rid} running')
-                start_receiver(host, port, dest, shared_state.get('max_files'), reconstruct_after=shared_state.get('reconstruct_after'), reconstruct_out=shared_state.get('reconstruct_out'), shared_state=shared_state)
-                self._log(f'Receiver {rid} exited')
+                start_receiver(host, port_value, dest, shared_state.get('max_files'), reconstruct_after=shared_state.get('reconstruct_after'), reconstruct_out=shared_state.get('reconstruct_out'), shared_state=shared_state)
+                self._log(f'Receiver {rid} exited ({port_value})')
             except Exception as e:
-                self._log(f'Receiver {rid} error: {e}')
+                self._log(f'Receiver {rid} error on {port_value}: {e}')
             finally:
                 self._set_status('Ready')
 
@@ -365,12 +469,16 @@ class VEITAGUI(tk.Tk):
         threads = None
         if scramble_n and scramble_n > 0:
             threads = _run_scramble(scramble_n)
+            port_display = 'random'
         else:
-            t = threading.Thread(target=_run_single, daemon=True)
-            t.start()
-            threads = [t]
+            threads = []
+            for p in port_list:
+                t = threading.Thread(target=_run_single, args=(p,), daemon=True)
+                t.start()
+                threads.append(t)
+            port_display = ','.join(str(p) for p in port_list)
 
-        self.receivers[rid] = {'threads': threads, 'state': shared_state, 'host': host, 'port': port if not scramble_n else 'random', 'dest': dest}
+        self.receivers[rid] = {'threads': threads, 'state': shared_state, 'host': host, 'port': port_display, 'dest': dest}
         self._list_receivers()
 
     def _toggle_scramble(self):
@@ -378,13 +486,17 @@ class VEITAGUI(tk.Tk):
             # reuse the same input as "number of ports" when scrambling
             self.rc_port_label.configure(text='Ports (N):')
             # default to 0 when switching into scramble mode
-            if self.rc_port.get() == 8000:
-                self.rc_port.set(0)
+            if self.rc_port.get() == '8000':
+                self.rc_port.set('0')
             self.rc_port_entry.state(['!disabled'])
         else:
-            self.rc_port_label.configure(text='Port:')
-            if self.rc_port.get() <= 0:
-                self.rc_port.set(8000)
+            self.rc_port_label.configure(text='Port(s):')
+            try:
+                v = int(self.rc_port.get())
+            except Exception:
+                v = 0
+            if v <= 0:
+                self.rc_port.set('8000')
             self.rc_port_entry.state(['!disabled'])
 
     def _toggle_max(self):
