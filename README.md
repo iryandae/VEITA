@@ -66,7 +66,7 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 
 ## Send Tab
 
-<img width="1077" height="690" alt="VEITA GUI - send tab" src="https://github.com/user-attachments/assets/495b246e-c54f-402c-9710-15209a00adbb" />
+<img width="1077" height="690" alt="Cuplikan layar 2025-12-12 155928" src="https://github.com/user-attachments/assets/7bc2cdd6-820c-4253-80bc-9227733b85e6" />
 
 ### Features:
 - **Input image selection**  
@@ -95,9 +95,7 @@ The GUI provides **tab-based control** for sending, receiving, and monitoring lo
 
 ## Receiver Tab
 
-<img width="1077" height="690" alt="image" src="https://github.com/user-attachments/assets/6d9aa7d6-3dbf-44f8-a1d5-75b4342cab35" />
-
-
+<img width="1077" height="690" alt="Cuplikan layar 2025-12-12 155956" src="https://github.com/user-attachments/assets/793abddf-7206-4241-9516-cf4625838b87" />
 
 ### Features:
 - **Save folder**  
